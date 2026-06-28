@@ -1,0 +1,8 @@
+model,variable,MW_U,p_value,significant_p05,cohens_d,effect_size,bootstrap_ci_95_low,bootstrap_ci_95_high,mean_NV,mean_V
+wav2vec2-MSP-dim,Arousal,73.0,0.1057,False,-0.6074,medium,-0.00151,8e-05,0.33038,0.33108
+wav2vec2-MSP-dim,Valence,88.0,0.3195,False,-0.2318,small,-0.00115,0.0006,0.33635,0.33664
+wav2vec2-MSP-dim,Dominance,171.0,0.0161,True,0.9294,large,0.00023,0.00173,0.33326,0.33227
+HuBERT-IEMOCAP,Happy,178.0,0.007,True,1.1373,large,0.03768,0.14776,0.43394,0.34142
+HuBERT-IEMOCAP,Neutral,191.0,0.0012,True,1.321,large,0.03934,0.12304,0.23098,0.15053
+HuBERT-IEMOCAP,Sad,35.0,0.0014,True,-1.3911,large,-0.26996,-0.09134,0.32239,0.50285
+HuBERT-IEMOCAP,Angry,212.0,0.0,True,1.4643,large,0.00444,0.01138,0.01268,0.00521
