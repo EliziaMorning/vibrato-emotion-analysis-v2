@@ -97,35 +97,61 @@ def bootstrap_ci(a, b, n=5000, seed=42):
     return np.percentile(diffs, [2.5, 97.5])
 
 def fig2_bar_model1():
+    """
+    Dual-panel bar chart.
+    Left:  full 0–1 axis  → honest view, shows scores cluster near 0.333
+    Right: zoomed axis    → makes small differences readable, with explicit
+                            Δ annotations and 'axis break' warning
+    """
     dims = ["arousal", "valence", "dominance"]
     labels_pretty = ["Arousal", "Valence", "Dominance"]
     x = np.arange(len(dims))
     width = 0.32
 
-    fig, ax = plt.subplots(figsize=(9, 5))
-    fig.suptitle("Model 1  ·  Group Means ± 95% CI (Bootstrap)",
+    fig, (ax_full, ax_zoom) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle("Model 1 (wav2vec2-MSP-dim)  ·  Group Means ± SEM",
                  fontsize=13, fontweight="bold")
 
-    for i, (dim, lbl) in enumerate(zip(dims, labels_pretty)):
+    means_nv, means_v, sems_nv, sems_v = [], [], [], []
+    for dim in dims:
         nv_vals = nv1[dim].values
         v_vals  = v1[dim].values
-        m_nv, m_v = np.mean(nv_vals), np.mean(v_vals)
-        ci_nv = bootstrap_ci(nv_vals, nv_vals)  # single-group CI vs mean
-        # 95% CI of mean via bootstrap difference isn't ideal for single group
-        # use SEM * 1.96 for display
-        sem_nv = np.std(nv_vals, ddof=1) / np.sqrt(len(nv_vals)) * 1.96
-        sem_v  = np.std(v_vals,  ddof=1) / np.sqrt(len(v_vals))  * 1.96
+        means_nv.append(np.mean(nv_vals))
+        means_v.append(np.mean(v_vals))
+        sems_nv.append(np.std(nv_vals, ddof=1) / np.sqrt(len(nv_vals)) * 1.96)
+        sems_v.append(np.std(v_vals,  ddof=1) / np.sqrt(len(v_vals))  * 1.96)
 
-        ax.bar(x[i] - width/2, m_nv, width, color=C_NV, alpha=0.85,
-               yerr=sem_nv, capsize=4, label="No Vibrato" if i == 0 else "")
-        ax.bar(x[i] + width/2, m_v,  width, color=C_V,  alpha=0.85,
-               yerr=sem_v,  capsize=4, label="Vibrato" if i == 0 else "")
+    for ax, ylim, title_suffix in [
+        (ax_full, (0.0, 0.5),   "Full scale (0–0.5)"),
+        (ax_zoom, (0.328, 0.340), "Zoomed — ⚠ axis does not start at 0"),
+    ]:
+        for i, lbl in enumerate(labels_pretty):
+            ax.bar(x[i] - width/2, means_nv[i], width, color=C_NV, alpha=0.85,
+                   yerr=sems_nv[i], capsize=4, label="No Vibrato" if i == 0 else "")
+            ax.bar(x[i] + width/2, means_v[i],  width, color=C_V,  alpha=0.85,
+                   yerr=sems_v[i],  capsize=4, label="Vibrato"    if i == 0 else "")
 
-    ax.set_xticks(x); ax.set_xticklabels(labels_pretty, fontsize=11)
-    ax.set_ylabel("Mean Score", fontsize=10)
-    ax.set_ylim(0.320, 0.345)
-    ax.legend(fontsize=10)
-    ax.spines[["top","right"]].set_visible(False)
+        ax.set_xticks(x); ax.set_xticklabels(labels_pretty, fontsize=11)
+        ax.set_ylabel("Mean Score", fontsize=10)
+        ax.set_ylim(*ylim)
+        ax.set_title(title_suffix, fontsize=10, style="italic")
+        ax.legend(fontsize=9)
+        ax.spines[["top","right"]].set_visible(False)
+
+    # annotate absolute Δ on zoomed panel
+    for i in range(len(dims)):
+        delta = means_nv[i] - means_v[i]
+        top   = max(means_nv[i] + sems_nv[i], means_v[i] + sems_v[i]) + 0.0003
+        ax_zoom.text(x[i], top, f"Δ={delta*1000:.2f}×10⁻³",
+                     ha="center", va="bottom", fontsize=8, color="dimgray")
+
+    # warn about axis break
+    ax_zoom.text(0.5, 0.02,
+                 "Note: all scores span < 0.006 on a 0–1 scale.\n"
+                 "Differences are statistically detectable but practically tiny.",
+                 transform=ax_zoom.transAxes, ha="center", va="bottom",
+                 fontsize=7.5, color="firebrick",
+                 bbox=dict(boxstyle="round,pad=0.3", fc="#fff3f3", alpha=0.85))
 
     path = os.path.join(FIG_DIR, "fig2_model1_bar.png")
     plt.tight_layout()
@@ -204,6 +230,19 @@ def fig4_bar_model2():
     ax.set_ylabel("Mean Probability", fontsize=10)
     ax.legend(fontsize=10)
     ax.spines[["top","right"]].set_visible(False)
+
+    # annotate absolute Δ above each pair
+    for i, (cat, lbl) in enumerate(zip(cats, labels_pretty)):
+        nv_vals = nv2[cat].values
+        v_vals  = v2[cat].values
+        m_nv, m_v = np.mean(nv_vals), np.mean(v_vals)
+        sem_nv = np.std(nv_vals, ddof=1) / np.sqrt(len(nv_vals)) * 1.96
+        sem_v  = np.std(v_vals,  ddof=1) / np.sqrt(len(v_vals))  * 1.96
+        delta = m_nv - m_v
+        top   = max(m_nv + sem_nv, m_v + sem_v) + 0.01
+        sign  = "+" if delta >= 0 else ""
+        ax.text(x[i], top, f"Δ={sign}{delta:.3f}", ha="center", va="bottom",
+                fontsize=8, color="dimgray")
 
     path = os.path.join(FIG_DIR, "fig4_model2_bar.png")
     plt.tight_layout()
@@ -375,9 +414,16 @@ def run_stats():
         r_sp, p_sp = stats.spearmanr(
             merged["arousal"], merged["happy"]
         ) if var in ["Arousal","Happy"] else (None, None)
+        abs_diff = abs(np.mean(nv_a) - np.mean(v_a))
+        # practical significance: differences < 0.005 on a 0-1 scale flagged as trivial
+        practical = ("trivial (delta < 0.005 on 0-1 scale)"
+                     if abs_diff < 0.005 else "meaningful")
         inf_rows.append({
             "model": model,
             "variable": var,
+            "mean_NV": round(np.mean(nv_a), 5),
+            "mean_V":  round(np.mean(v_a), 5),
+            "abs_diff": round(abs_diff, 5),
             "MW_U": round(u, 1),
             "p_value": round(p, 4),
             "significant_p05": p < 0.05,
@@ -386,8 +432,7 @@ def run_stats():
                             else "small" if abs(d)>0.2 else "negligible"),
             "bootstrap_ci_95_low":  round(ci[0], 5),
             "bootstrap_ci_95_high": round(ci[1], 5),
-            "mean_NV": round(np.mean(nv_a), 5),
-            "mean_V":  round(np.mean(v_a), 5),
+            "practical_significance": practical,
         })
 
     inf_df = pd.DataFrame(inf_rows)
@@ -407,7 +452,9 @@ def run_stats():
 
     # pretty print
     print("\n── Inferential Statistics ─────────────────────────────────────────")
-    print(inf_df[["model","variable","p_value","significant_p05","cohens_d","effect_size"]].to_string(index=False))
+    cols = ["model","variable","mean_NV","mean_V","abs_diff",
+            "p_value","significant_p05","cohens_d","effect_size","practical_significance"]
+    print(inf_df[cols].to_string(index=False))
     print(f"\nSpearman ρ(Arousal, Happy) = {r_sp:.4f}, p = {p_sp:.4f}")
 
 

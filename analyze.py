@@ -12,7 +12,8 @@ import torch
 import warnings
 warnings.filterwarnings("ignore")
 
-from transformers import pipeline
+import torch
+from transformers import pipeline, AutoConfig, AutoProcessor, AutoModelForAudioClassification
 
 # ── paths ──────────────────────────────────────────────────────────────────────
 AUDIO_DIR = os.path.join(os.path.dirname(__file__), "audio")
@@ -42,17 +43,34 @@ def list_files():
 
 # ── Model 1: dimensional (A/V/D) ───────────────────────────────────────────────
 def run_model1(files):
-    print("[Model 1] Loading wav2vec2 dimensional model …")
-    pipe = pipeline(
-        "audio-classification",
-        model="audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim",
-        device="cpu",
-    )
+    """
+    Direct model inference — avoids pipeline softmax which collapses
+    all three regression outputs to ~0.333.
+    Raw logits are the actual continuous regression values.
+    """
+    MODEL_NAME = "audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim"
+    print("[Model 1] Loading wav2vec2 dimensional model (direct) …")
+    config    = AutoConfig.from_pretrained(MODEL_NAME)
+    processor = AutoProcessor.from_pretrained(MODEL_NAME)
+    model     = AutoModelForAudioClassification.from_pretrained(MODEL_NAME)
+    model.eval()
+
+    # label order from config
+    id2label = config.id2label   # {0: 'arousal', 1: 'dominance', 2: 'valence'} (order may vary)
+    print(f"  Label order: {id2label}")
+
     rows = []
     for f in files:
         audio = load_sustain(f["path"])
-        out = pipe({"array": audio, "sampling_rate": SR_TARGET}, top_k=None)
-        scores = {item["label"]: item["score"] for item in out}
+        # normalize amplitude
+        if np.max(np.abs(audio)) > 0:
+            audio = audio / np.max(np.abs(audio))
+        inputs = processor(audio, sampling_rate=SR_TARGET,
+                           return_tensors="pt", padding=True)
+        with torch.no_grad():
+            logits = model(**inputs).logits  # shape (1, 3) — raw regression values
+        vals = logits[0].cpu().numpy()
+        scores = {id2label[i]: float(vals[i]) for i in range(len(vals))}
         rows.append({
             "file":      f["file"],
             "condition": f["condition"],
@@ -60,8 +78,8 @@ def run_model1(files):
             "valence":   scores.get("valence",   np.nan),
             "dominance": scores.get("dominance", np.nan),
         })
-        print(f"  {f['file']:12s}  A={scores.get('arousal',0):.3f}  "
-              f"V={scores.get('valence',0):.3f}  D={scores.get('dominance',0):.3f}")
+        print(f"  {f['file']:12s}  A={scores.get('arousal',0):.4f}  "
+              f"V={scores.get('valence',0):.4f}  D={scores.get('dominance',0):.4f}")
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(DATA_DIR, "model1_avd.csv"), index=False)
     print("[Model 1] Done. Saved model1_avd.csv\n")

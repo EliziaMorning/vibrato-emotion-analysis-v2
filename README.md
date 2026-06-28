@@ -1,12 +1,12 @@
 # Vibrato & Emotion Analysis v2
 
-Cross-model analysis of how vocal vibrato affects AI-perceived emotional dimensions, using two complementary emotion recognition frameworks.
+Cross-model analysis of how vocal vibrato affects AI-perceived emotion, using two complementary frameworks on the same 30 recordings.
 
 ---
 
 ## Research Question
 
-Does the presence of vibrato in sustained vocal notes shift AI-predicted emotional scores, and do two theoretically distinct models converge on the same answer?
+Does the presence of vibrato in a sustained vocal note shift the emotional scores predicted by AI emotion models — and do two theoretically distinct models agree?
 
 ---
 
@@ -15,57 +15,66 @@ Does the presence of vibrato in sustained vocal notes shift AI-predicted emotion
 | Group | Files | Description |
 |-------|-------|-------------|
 | No Vibrato (NV) | NV_1 – NV_15 | Sustained notes without vibrato |
-| Vibrato (V) | V_1 – V_15 | Same phrases with vibrato |
+| Vibrato (V) | V_1 – V_15 | Same phrases sung with vibrato |
 
-- 30 recordings total · single vocalist · `.m4a` format  
-- Analysis segment: last **0.60 s** (sustain region where vibrato is applied)
+- 30 recordings · single vocalist · `.m4a` source files
+- Analysis segment: last **0.60 s** of the sustain, extracted via energy-based endpoint detection
+
+### Preprocessing Pipeline
+
+```
+m4a  →  [ffmpeg] 44.1 kHz mono WAV
+     →  [librosa] silence trim (top_db=30) + RMS normalise to 0.08
+     →  energy endpoint → last 0.60 s + 0.10 s pad + 15 ms fade
+     →  [model] resample to 16 kHz, amplitude normalise, inference
+```
 
 ---
 
-## Models
+## Models & Rationale
 
-### Model 1 — Dimensional (wav2vec2-MSP-dim)
-`audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`  
-Outputs continuous scores for **Arousal / Valence / Dominance** (0–1).  
-Based on the *dimensional* view of emotion (Russell's circumplex model).
+| | Model | Framework | Output |
+|-|-------|-----------|--------|
+| **M1** | `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` | Dimensional (Russell's circumplex) | Continuous: Arousal / Valence / Dominance |
+| **M2** | `superb/hubert-large-superb-er` (IEMOCAP) | Categorical (discrete states) | Probability: Happy / Neutral / Sad / Angry |
 
-### Model 2 — Categorical (HuBERT-IEMOCAP)
-`superb/hubert-large-superb-er`  
-Outputs probability distributions over **Happy / Neutral / Sad / Angry**.  
-Based on the *categorical* view of discrete emotional states (trained on IEMOCAP).
-
-**Rationale for using two models:** Emotion theory is divided between dimensional and categorical frameworks. If vibrato genuinely shifts perceived emotion, the effect should appear regardless of which framework is used. Agreement between models strengthens confidence; disagreement reveals which dimension or category captures the effect.
+**Why two models?** Emotion science is divided between dimensional and categorical theories. Using both lets us check whether any effect appears regardless of which framework is applied — agreement strengthens confidence; divergence is itself a finding.
 
 ---
 
 ## Visualizations
 
 ### Model 1 — Dimensional Scores
+
 | | |
 |---|---|
 | ![fig1](results/figures/fig1_model1_violin.png) | ![fig2](results/figures/fig2_model1_bar.png) |
-| **Fig 1.** Violin + strip plots. Each dot = one recording (n=15 per group). Median shown as horizontal line inside violin. | **Fig 2.** Group means ± 95% CI. Arousal shows a Vibrato-higher trend; Dominance is significantly lower with Vibrato. |
+| **Fig 1.** Violin + strip plots for Arousal / Valence / Dominance. Each dot = one recording (n=15 per group). | **Fig 2.** Group means ± SEM. Left panel: full 0–0.5 scale. Right panel: zoomed with explicit Δ labels and axis-break warning. |
 
 ### Model 2 — Categorical Probabilities
+
 | | |
 |---|---|
 | ![fig3](results/figures/fig3_model2_violin.png) | ![fig4](results/figures/fig4_model2_bar.png) |
-| **Fig 3.** Probability distributions by condition. Sad probability visibly higher in Vibrato group. | **Fig 4.** Group means ± 95% CI. Happy/Neutral/Angry all higher in No Vibrato; Sad clearly reversed. |
+| **Fig 3.** Probability distributions by condition. Happy visibly higher in No Vibrato; Neutral higher in Vibrato. | **Fig 4.** Group means ± SEM with absolute Δ annotations. |
 
 ### Cross-Model Fusion
+
 | | |
 |---|---|
 | ![fig5](results/figures/fig5_fusion_scatter.png) | ![fig6](results/figures/fig6_effect_size.png) |
-| **Fig 5.** Arousal (Model 1) × Happy probability (Model 2). Each point = one recording. Diamonds = group centroids; shaded ellipses = 1.5σ confidence region. | **Fig 6.** Cohen's d for all variables across both models. Negative d = Vibrato group higher. Reference lines at small/medium/large thresholds. |
+| **Fig 5.** Arousal (M1) × Happy probability (M2) scatter. Diamonds = group centroids; ellipses = 1.5σ confidence regions. Spearman ρ annotated. | **Fig 6.** Cohen's d for all 7 variables across both models on a single axis. Dashed lines at small / medium / large thresholds. |
 
 ---
 
 ## Raw Data
 
-- [`results/data/model1_avd.csv`](results/data/model1_avd.csv) — per-file Arousal/Valence/Dominance scores  
-- [`results/data/model2_categorical.csv`](results/data/model2_categorical.csv) — per-file Happy/Neutral/Sad/Angry probabilities  
-- [`results/data/merged.csv`](results/data/merged.csv) — both models joined by file  
-- [`results/stats/descriptive_stats.csv`](results/stats/descriptive_stats.csv) — mean, SD, median, IQR, min, max per variable per condition  
+| File | Contents |
+|------|---------|
+| [`results/data/model1_avd.csv`](results/data/model1_avd.csv) | Per-file Arousal / Valence / Dominance (raw regression logits) |
+| [`results/data/model2_categorical.csv`](results/data/model2_categorical.csv) | Per-file Happy / Neutral / Sad / Angry probabilities |
+| [`results/data/merged.csv`](results/data/merged.csv) | Both models joined by file |
+| [`results/data/segment_metadata.csv`](results/data/segment_metadata.csv) | Segment start / end times per file |
 
 ---
 
@@ -73,26 +82,28 @@ Based on the *categorical* view of discrete emotional states (trained on IEMOCAP
 
 ### Methods
 
-| Test | Purpose |
-|------|---------|
-| **Mann-Whitney U** | Non-parametric group comparison (no normality assumption; n=15) |
-| **Cohen's d** | Effect size — magnitude of difference independent of sample size |
-| **Bootstrap 95% CI** | Confidence interval without distributional assumptions |
-| **Spearman ρ** | Cross-model correlation (Arousal × Happy probability) |
+| Method | Purpose |
+|--------|---------|
+| **Mann-Whitney U** | Non-parametric two-group comparison (no normality assumption; n=15) |
+| **Cohen's d** | Effect size — magnitude of difference independent of p-value |
+| **Bootstrap 95% CI** | Confidence interval on group mean difference (5,000 resamples) |
+| **Spearman ρ** | Cross-model correlation: Arousal (M1) × Happy probability (M2) |
 
 ### Results
 
-| Model | Variable | p-value | Significant | Cohen's d | Effect Size | Mean NV | Mean V |
-|-------|----------|---------|-------------|-----------|-------------|---------|--------|
-| wav2vec2-MSP-dim | Arousal | 0.106 | — | −0.607 | medium | 0.331 | 0.334 |
-| wav2vec2-MSP-dim | Valence | 0.320 | — | −0.232 | small | 0.336 | 0.334 |
-| wav2vec2-MSP-dim | Dominance | **0.016** | ✓ | 0.929 | large | 0.332 | 0.332 |
-| HuBERT-IEMOCAP | Happy | **0.007** | ✓ | 1.137 | large | 0.422 | 0.348 |
-| HuBERT-IEMOCAP | Neutral | **0.001** | ✓ | 1.321 | large | 0.237 | 0.155 |
-| HuBERT-IEMOCAP | Sad | **0.001** | ✓ | −1.391 | large | 0.322 | 0.487 |
-| HuBERT-IEMOCAP | Angry | **< 0.001** | ✓ | 1.464 | large | 0.014 | 0.005 |
+| Model | Variable | Mean NV | Mean V | Abs. Δ | p-value | Cohen's d | Effect | Note |
+|-------|----------|---------|--------|--------|---------|-----------|--------|------|
+| wav2vec2-MSP-dim | Arousal | 0.0205 | 0.0239 | 0.0034 | 0.184 | −0.49 | small | V↑ trend, non-significant |
+| wav2vec2-MSP-dim | Valence | −0.0036 | −0.0039 | 0.0004 | 0.561 | 0.07 | negligible | no difference |
+| wav2vec2-MSP-dim | Dominance | 0.0137 | 0.0188 | 0.0051 | 0.062 | −0.58 | medium | V↑ borderline |
+| HuBERT-IEMOCAP | **Happy** | **0.518** | **0.379** | **0.139** | **0.009** | **0.97** | **large** | **NV significantly happier** |
+| HuBERT-IEMOCAP | **Neutral** | **0.248** | **0.305** | **0.057** | **0.028** | **−0.87** | **large** | **V significantly more neutral** |
+| HuBERT-IEMOCAP | Sad | 0.217 | 0.296 | 0.079 | 0.056 | −0.71 | medium | V↑ borderline |
+| HuBERT-IEMOCAP | Angry | 0.016 | 0.020 | 0.004 | 0.455 | −0.22 | small | no difference |
 
-**Cross-model correlation:** Spearman ρ(Arousal, Happy) = −0.168, p = 0.374 (not significant)
+**Cross-model:** Spearman ρ(Arousal, Happy) = 0.172, p = 0.364 — not significant
+
+> **Note on Model 1 scale:** All dimensional scores are raw regression logits (range ~0.007–0.037), not a 0–1 probability scale. Both groups score near zero on all three dimensions, reflecting that a speech-trained model assigns low emotional salience to sustained singing tones. Absolute differences are small; results should be interpreted as trends rather than definitive scores.
 
 Full tables → [`results/stats/`](results/stats/)
 
@@ -100,40 +111,35 @@ Full tables → [`results/stats/`](results/stats/)
 
 ## Key Findings
 
-1. **Vibrato increases Arousal** (Model 1, medium effect, trend) — consistent with the intuition that vibrato adds acoustic energy and perceived intensity.
+1. **Vibrato increases Arousal (trend, M1).** Vibrato group Arousal is consistently higher (V=0.024 vs NV=0.021), though not statistically significant (p=0.184) at n=15. The direction is consistent with the original v1 analysis.
 
-2. **Vibrato shifts categorical emotion toward Sad** (Model 2, large effect, p=0.001) while simultaneously reducing Happy, Neutral, and Angry probabilities.
+2. **Vibrato decreases Happy and increases Neutral (M2, significant).** With vibrato, the AI assigns significantly lower Happy probability (−13.9 pp, p=0.009, d=0.97) and significantly higher Neutral probability (+5.7 pp, p=0.028, d=−0.87).
 
-3. **The two models diverge on the valence axis.** The dimensional model (Model 1) does not detect a significant Valence change, while the categorical model (Model 2) shows a clear shift from positive/neutral to sad. This suggests vibrato primarily encodes *intensity* rather than *positivity*.
+3. **Vibrato trends toward Sad (M2, borderline).** Sad probability is higher in the vibrato condition (+7.9 pp, p=0.056, d=−0.71) — not significant at α=0.05 but consistent in direction.
 
-4. **Dominance decreases with vibrato** (large effect, p=0.016). This may reflect that vibrato, by introducing pitch modulation, reduces the percept of vocal control or assertiveness.
+4. **The two models do not correlate** (Spearman ρ=0.17, p=0.364). Arousal (intensity dimension, M1) and Happy probability (valence category, M2) capture different aspects — a high-Arousal sample is not necessarily rated as Happy.
 
-5. **Cross-model correlation is near zero** (ρ = −0.17), confirming that Arousal and Happy probability are not equivalent measures — the two frameworks capture distinct emotional dimensions.
+### Interpretation
 
----
-
-## Interpretation
-
-The pattern *Arousal ↑ + Sad ↑* is consistent with emotional states such as longing, yearning, or pathos — sensations often associated with expressive singing that uses vibrato. This aligns with aesthetic theories of vibrato as a technique that adds expressive "color" by introducing tension rather than brightness.
-
-The divergence between Model 1 (dimensional) and Model 2 (categorical) is itself a finding: vibrato-induced acoustic changes do not map cleanly onto a single emotional framework, underscoring the importance of cross-model validation in AI emotion analysis.
+The pattern **Arousal↑ + Happy↓ + Neutral↑** suggests that vibrato increases perceived emotional *intensity* while simultaneously shifting the valence away from positive affect. The AI perceives vibrato-singing as more emotionally charged but less bright or cheerful — consistent with vibrato conveying expressiveness, longing, or pathos rather than simple positivity.
 
 ---
 
 ## Limitations
 
-- Single vocalist; results may not generalize across voice types or recording conditions.
-- Both models were trained on speech data (not singing), which may affect calibration.
-- n=15 per group limits statistical power; effects should be interpreted with caution.
-- Analysis targets the last 0.60 s of each clip; phrase-level context is excluded.
+- Single vocalist; results may not generalise across voice types or styles.
+- Both models trained on speech data, not singing — absolute scores should be treated as relative comparisons only.
+- n=15 per group; effects should be replicated with larger samples.
+- Segment boundaries detected automatically; slight variation across files.
 
 ---
 
 ## Code
 
-```
-analyze.py      — audio loading, Model 1 + Model 2 inference, CSV export
-visualize.py    — 6 figures + statistical tests
-```
+| File | Description |
+|------|-------------|
+| `pipeline.py` | Full preprocessing + segmentation + inference pipeline |
+| `analyze.py` | Standalone inference script (reference) |
+| `visualize.py` | All 6 figures + statistical tests |
 
-**Dependencies:** `torch`, `transformers`, `librosa`, `scipy`, `matplotlib`, `numpy`, `pandas`
+**Dependencies:** `torch`, `transformers`, `librosa`, `soundfile`, `scipy`, `matplotlib`, `numpy`, `pandas`

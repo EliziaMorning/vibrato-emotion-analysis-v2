@@ -1,8 +1,8 @@
-model,variable,MW_U,p_value,significant_p05,cohens_d,effect_size,bootstrap_ci_95_low,bootstrap_ci_95_high,mean_NV,mean_V
-wav2vec2-MSP-dim,Arousal,73.0,0.1057,False,-0.6074,medium,-0.00151,8e-05,0.33038,0.33108
-wav2vec2-MSP-dim,Valence,88.0,0.3195,False,-0.2318,small,-0.00115,0.0006,0.33635,0.33664
-wav2vec2-MSP-dim,Dominance,171.0,0.0161,True,0.9294,large,0.00023,0.00173,0.33326,0.33227
-HuBERT-IEMOCAP,Happy,178.0,0.007,True,1.1373,large,0.03768,0.14776,0.43394,0.34142
-HuBERT-IEMOCAP,Neutral,191.0,0.0012,True,1.321,large,0.03934,0.12304,0.23098,0.15053
-HuBERT-IEMOCAP,Sad,35.0,0.0014,True,-1.3911,large,-0.26996,-0.09134,0.32239,0.50285
-HuBERT-IEMOCAP,Angry,212.0,0.0,True,1.4643,large,0.00444,0.01138,0.01268,0.00521
+model,variable,mean_NV,mean_V,abs_diff,MW_U,p_value,significant_p05,cohens_d,effect_size,bootstrap_ci_95_low,bootstrap_ci_95_high,practical_significance
+wav2vec2-MSP-dim,Arousal,0.02047,0.02392,0.00345,80.0,0.1844,False,-0.4886,small,-0.00817,0.00152,trivial (delta < 0.005 on 0-1 scale)
+wav2vec2-MSP-dim,Valence,-0.00356,-0.00392,0.00036,127.0,0.5614,False,0.0702,negligible,-0.00328,0.00384,trivial (delta < 0.005 on 0-1 scale)
+wav2vec2-MSP-dim,Dominance,0.0137,0.01877,0.00507,67.0,0.062,False,-0.5811,medium,-0.01104,0.00107,meaningful
+HuBERT-IEMOCAP,Happy,0.51849,0.37916,0.13933,176.0,0.009,True,0.9683,large,0.03984,0.23683,meaningful
+HuBERT-IEMOCAP,Neutral,0.24832,0.30494,0.05662,59.0,0.0279,True,-0.8659,large,-0.10172,-0.00975,meaningful
+HuBERT-IEMOCAP,Sad,0.21694,0.29572,0.07878,66.0,0.0564,False,-0.7107,medium,-0.15424,-0.00253,meaningful
+HuBERT-IEMOCAP,Angry,0.01624,0.02018,0.00393,94.0,0.4553,False,-0.2229,small,-0.01773,0.00645,trivial (delta < 0.005 on 0-1 scale)
